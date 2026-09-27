@@ -1,0 +1,80 @@
+OSI MODEL, TCP/UDP, AND SNIFFER NOTES
+
+I learned that data is never sent as one massive file; instead, it's broken into small bits of information called packets. These packets get encapsulated with routing information so they can be transmitted in the right sequence and reach the intended destination. This follows a framework called the OSI model, which breaks down into four layers I focused on:
+1. The application layer: the data itself.
+2. The transport layer (TCP/UDP): the port number, i.e. which application has to open the packet.
+3. The network layer (IP): the IP address, which decides which computer the packet is travelling to.
+4. The data link layer (Ethernet/Wi-Fi): the MAC address, which moves data from my computer to the router.
+
+------------------------------------------------------------
+Why Sniffing Requires Admin Rights
+------------------------------------------------------------
+Normally, a computer's Network Interface Card (NIC) operates in a selective mode by default — it drops any incoming frame whose destination MAC address doesn't match its own.
+
+A packet sniffer forces the NIC into promiscuous mode. In this state, the hardware disables its address filter and passes all traffic flowing across the shared network medium straight to the CPU.
+
+This is a real security risk: if unprivileged users could enable promiscuous mode, malware could easily perform credential sniffing or session hijacking by capturing sensitive, cleartext data belonging to other devices on the local network.
+
+That's why operating systems restrict control over the NIC's operational modes as a mitigation. Access to raw sockets and promiscuous mode configuration strictly requires elevated Administrator (Windows) or Root/Sudo (Linux/Mac) privileges.
+
+Question I should be ready for in an interview: if someone looks at my sniff() function and asks what the store=0 argument does, and why it matters for a tool meant to run for a long time — I should think about what happens to my computer's RAM if the script tries to save every single packet it captures permanently.
+
+------------------------------------------------------------
+1. The Spyder Output (127.0.0.1)
+------------------------------------------------------------
+In my Spyder console, I saw Source: 127.0.0.1 -> Destination: 127.0.0.1.
+
+127.0.0.1 is a special IP address known as localhost, or the loopback address — it represents my own computer talking directly to itself.
+
+This happened because Spyder runs background processes locally to manage its editor and variables, so it's constantly talking to itself under the hood. My sniffer caught Spyder talking to its own reflection.
+
+------------------------------------------------------------
+2. The Command Prompt Output (169.254.x.x and 224.x.x.x)
+------------------------------------------------------------
+When I ran it in the actual Command Prompt, I caught real, live background network data:
+
+169.254.28.209 is a special type of IP address called an APIPA (Automatic Private IP Address). When a computer can't talk to a Wi-Fi router to get a standard IP address, Windows automatically assigns itself an address starting with 169.254 so it can at least look for other local devices.
+
+224.0.0.251 and 224.0.0.22 are multicast IP addresses. Instead of sending a packet to one specific computer, my machine used these addresses to broadcast a message to a group of local devices simultaneously — likely searching for network features like local printers or shared services.
+
+------------------------------------------------------------
+The store=0 Argument
+------------------------------------------------------------
+By default, if I don't include store=0, Scapy assumes I want to save every single packet I capture inside my computer's RAM so I can look at it later.
+
+If I leave my sniffer running on a busy network (like a corporate office or a gaming network) for hours or days, it will capture millions of packets. If it tries to hold all of those in RAM, my computer will quickly run out of memory, freeze up, and the script will crash.
+
+By setting store=0, I'm telling Python: capture the packet, pass it to my function so I can print it out, and then immediately throw it out of memory — don't save it. This keeps my RAM usage at zero, so the tool can run forever without crashing the system.
+
+------------------------------------------------------------
+Why My Sniffer Focuses on Layer 3 and Layer 4, Not Layer 2
+------------------------------------------------------------
+Layer 2 handles local MAC addresses between immediate hardware jumps. Since my tool is designed to detect network anomalies and internet-based attacks, I focus on Layer 3 (IP addresses) and Layer 4 (port numbers), which track global routing and application-specific traffic.
+
+My understanding: the MAC address is a hardware property and outgoing data, and it is not physically accessible to distant hackers, while packets are incoming data and are accessible through the device's software credentials (port number and IP address), which is why hackers need them, and therefore I focus less on the data link layer and more on the other two. What I mean to say is, the MAC address is unique to the NIC and connects it to the router, but it is not the identity of the current device software that handles the packets.
+
+------------------------------------------------------------
+TCP vs UDP
+------------------------------------------------------------
+TCP (Transmission Control Protocol): ensures that the data has a formal connection before being sent. It ensures every packet is sent safely and in order, and if a packet is dropped, it will be resent. Examples: HTTP/HTTPS (web browsing), downloads, email, etc. (errors here can corrupt files).
+
+UDP (User Datagram Protocol): instant blasts of data, with no provision for packet retention or keeping data in order. High efficiency, but no error correction. Examples: gaming, video calls, etc. (minor glitches can happen, but speed is the top priority).
+
+------------------------------------------------------------
+Logging: Append vs Write
+------------------------------------------------------------
+with open("network_log.txt", "a") as log_file:
+    log_file.write(data)
+
+Here, "a" means append — it adds network packets one after another. "w" (write) doesn't do that; instead, it would delete the previous logs every time a new packet arrives.
+
+------------------------------------------------------------
+DoS / Flooding Attacks
+------------------------------------------------------------
+In cybersecurity, a DoS (Denial of Service) or flooding attack is a volumetric attack.
+
+Normal traffic: when I'm just browsing or idling, my device handles a low, steady stream of packets (e.g., 5 to 20 packets per second).
+
+Anomalous traffic: when a hacker tries to crash my device, they use automated scripts to blast thousands of packets at my IP address in a single second.
+
+To catch this, my script needs a system to keep score. Before I track time or speeds, my script must first learn how to sequentially count every single incoming or outgoing packet that passes through my software filters.

@@ -1,0 +1,32 @@
+ISSUES RESOLVED
+Problems I hit while building the packet sniffer, how I figured them out, and the concepts I had to learn along the way to fix them.
+
+------------------------------------------------------------
+1. PPS Stale Count Bug (Fixed)
+------------------------------------------------------------
+When I first ran the script, the terminal kept showing "PPS: 0" for the first 15-20 packets, even though traffic was actively flowing. I found two bugs causing this.
+
+First, the packet counter was being incremented after the PPS math ran, so the script was calculating speed using an old, stale count instead of the current one. Second, I had put the start_time variable at the top of the file, which meant the 2-3 seconds Scapy takes to load its libraries on boot got counted as part of the elapsed time, throwing off the whole calculation from the start.
+
+To fix it, I moved the packet counter to the very top of the IP verification block, so every packet gets counted immediately no matter its protocol. Then I used a None placeholder for start_time so the stopwatch stays off until the first real packet arrives. That way the boot lag never gets baked into the timing, and the PPS numbers are accurate from packet one.
+
+------------------------------------------------------------
+2. None as a Stopwatch Flag (Concept)
+------------------------------------------------------------
+Normally, None is just used as a placeholder for a variable when you don't know its value yet, or as a flag to check if something has happened. In my sniffer, I used it specifically to delay the stopwatch.
+
+I knew I needed a start_time variable, but I didn't want to assign it a real clock time right when the script booted up, because Scapy takes a few seconds to load its libraries and I didn't want that lag counted as part of my traffic timing.
+
+So I set start_time = None at the start, and inside the callback function I check: if start_time is None, that means no packets have arrived yet, so the clock starts now, on the very first real packet. This quarantines the boot-up lag away from the actual math and keeps the PPS numbers accurate from the first packet onward.
+
+------------------------------------------------------------
+3. Racing Condition
+------------------------------------------------------------
+Racing condition: the same interface or network card is capturing the packets, however the packets are captured virtually at the same time and they do not know that the other one exists, as the code handling it runs on a completely different pathway on the computer's processor, and therefore one gets overwritten by the other.
+
+------------------------------------------------------------
+4. Why Ctrl+C Didn't Trigger My Shutdown Code (SIGINT / Windows Kill-Switch)
+------------------------------------------------------------
+When I pressed Ctrl+C inside the Windows Command Prompt, I expected Python to catch it and run my "except KeyboardInterrupt" block along with print_summary(). Instead, the whole program just vanished instantly with no summary printed.
+
+What's actually happening is Windows checks whether the program is responding to it right now. Because my script was single-threaded and trapped deep inside Scapy's hardware capture loop, it wasn't free to respond quickly enough. Windows assumed the program had frozen, so instead of sending Python a polite "please stop" message, it sent a hard SIGINT kill command from the outside and wiped the whole process from RAM in a fraction of a millisecond. Because the process was erased that fast, my script never even got the chance to reach the except block or run print_summary() — the plug was pulled before the script could respond.

@@ -1,0 +1,12 @@
+# Sniffer output/log — regenerated every run, can contain real local network data
+network_log.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS clutter
+.DS_Store
+Thumbs.db

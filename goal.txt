@@ -1,0 +1,4 @@
+The Automated Packet Sniffer & Anomaly Detector
+The Goal: Build a Python tool that sits on a network, intercepts raw data traffic, decodes it, and sounds an alarm if someone is trying to flood my system (like a DoS attack or DNS spoofing).
+
+The Core Concepts I Will Master: The OSI Model (Layers 2, 3, and 4), TCP/IP vs UDP, DNS mechanics, and network data structures.
